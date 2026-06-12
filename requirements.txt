@@ -1,0 +1,80 @@
+# =========================
+# FastAPI Framework
+# =========================
+
+fastapi
+# Main backend framework used to create APIs
+
+uvicorn[standard]
+# ASGI server used to run FastAPI application
+# Example: uvicorn app.main:app --reload
+
+
+# =========================
+# Database
+# =========================
+
+sqlalchemy
+# ORM (Object Relational Mapper)
+# Lets you interact with PostgreSQL using Python classes instead of raw SQL
+
+psycopg2-binary
+# PostgreSQL database driver
+# Allows Python to connect to PostgreSQL
+
+
+# =========================
+# Database Migrations
+# =========================
+
+alembic
+# Database migration tool
+# Used to create/update database tables automatically
+
+
+# =========================
+# Authentication & Security
+# =========================
+
+python-jose[cryptography]
+# Used for JWT tokens
+# Example: Login authentication
+
+passlib[bcrypt]
+# Password hashing library
+# Converts passwords into secure hashes before storing in database
+
+
+# =========================
+# File Uploads
+# =========================
+
+python-multipart
+# Required for handling file uploads
+# Example: Animal image upload
+
+
+# =========================
+# Data Validation
+# =========================
+
+pydantic
+# Validates request and response data
+# Used in FastAPI schemas
+
+pydantic-settings
+# Manages environment variables and application settings
+
+
+email-validator
+
+
+# =========================
+# Environment Variables
+# =========================
+
+python-dotenv
+# Loads variables from .env file
+# Example:
+# DATABASE_URL=...
+# SECRET_KEY=...
