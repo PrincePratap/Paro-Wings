@@ -78,3 +78,8 @@ python-dotenv
 # Example:
 # DATABASE_URL=...
 # SECRET_KEY=...
+
+
+PyJWT
+passlib[bcrypt]
+aiosmtplib

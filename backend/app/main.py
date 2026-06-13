@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from app.routers.auth import router as auth_routher 
+from app.routers.reports import router as reports_routher
 
 from app.database.base import Base
 from app.database.database import engine
@@ -11,6 +12,7 @@ app = FastAPI(
 )
 
 app.include_router(auth_routher)
+app.include_router(reports_routher)
 
 @app.get("/")
 def root():
