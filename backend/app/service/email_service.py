@@ -1,8 +1,11 @@
 from email.message import EmailMessage
 import aiosmtplib
+import os
 
-EMAIL_ADDRESS = "princepratapfreelancer@gmail.com"
-EMAIL_PASSWORD = "sbtn toqr cbbi zioj"
+
+
+EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
 
 async def send_otp_email(receiver_email: str, otp: str):
