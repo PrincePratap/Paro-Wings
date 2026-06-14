@@ -5,6 +5,7 @@ from app.routers.reports import router as reports_routher
 from app.database.base import Base
 from app.database.database import engine
 from app.models.user import User
+from app.routers.ngo import router as ngo_routher
 
 app = FastAPI(
     title="Paro Wings API",
@@ -13,6 +14,8 @@ app = FastAPI(
 
 app.include_router(auth_routher)
 app.include_router(reports_routher)
+app.include_router(ngo_routher)
+
 
 @app.get("/")
 def root():

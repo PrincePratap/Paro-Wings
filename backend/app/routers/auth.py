@@ -7,19 +7,14 @@ from app.schemas.userschemas import UserCreate
 from app.models.user import User 
 from app.models.otp import OTPVerification
 
-from app.schemas.otp import SendOTPRequest , VerifyOTPRequest
-from app.service.email_service import send_otp_email  
+from app.schemas.otp import   VerifyOTPRequest
 from fastapi import HTTPException
-from datetime import datetime, timedelta
-
-from app.models.otp import OTPVerification
-from app.utils.otp_generator import generate_otp
 from datetime import datetime
-from fastapi import HTTPException
 
-from app.models.otp import OTPVerification
 from app.utils.jwt import create_access_token
 from app.schemas.otp import LoginRequest
+from app.schemas.otp import   SendOTPRequest
+from app.service.otp_service import send_otp
 
 
 
@@ -38,10 +33,22 @@ def test_auth():
 
 
 @router.post("/register")
-def register(
+async def register(
     user: UserCreate,
     db: Session = Depends(get_db)
 ):
+    existing_user = (
+        db.query(User)
+        .filter(User.email == user.email)
+        .first()
+    )
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+
 
     new_user = User(
         full_name=user.full_name,
@@ -54,50 +61,21 @@ def register(
     db.commit()
     db.refresh(new_user)
 
-    return {
-        "message": "User Created"
-    }
-
-@router.post("/send-otp")
-async def send_otp(
-    data: SendOTPRequest,
-    db: Session = Depends(get_db)
-):
-
-    email = data.email
-
-    otp = generate_otp()
-
-    existing_otp = (
-        db.query(OTPVerification)
-        .filter(OTPVerification.email == email)
-        .first()
+  
+    otp_response = await send_otp(
+        SendOTPRequest(email=new_user.email),
+        db
     )
 
-    if existing_otp:
-
-        existing_otp.otp = otp
-        existing_otp.created_at = datetime.utcnow()
-        existing_otp.expires_at = datetime.utcnow() + timedelta(minutes=5)
-
-    else:
-
-        otp_record = OTPVerification(
-            email=email,
-            otp=otp,
-            expires_at=datetime.utcnow() + timedelta(minutes=5)
-        )
-
-        db.add(otp_record)
-
-    db.commit()
-
-    await send_otp_email(email, otp)
-
     return {
-        "success": True,
-        "message": "OTP sent successfully"
+        "message": "User Created",
+        "otp": otp_response,
+        "user": {
+            "id": str(new_user.id),
+            "email": new_user.email
+        }
     }
+
 
 @router.post("/verify-otp")
 async def verify_otp(
@@ -135,9 +113,19 @@ async def verify_otp(
     db.delete(otp_record)
     db.commit()
 
+
+    token = create_access_token(
+        {
+            "sub": data.user_id,
+            "email": data.email
+        }
+    )
+
+
     return {
         "success": True,
-        "message": "OTP verified successfully"
+        "message": "OTP verified successfully",
+        "bearer_token": token 
     }
 
 @router.post("/login")

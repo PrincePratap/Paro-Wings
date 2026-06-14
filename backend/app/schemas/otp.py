@@ -8,6 +8,7 @@ class SendOTPRequest(BaseModel):
 class VerifyOTPRequest(BaseModel):
     email: EmailStr
     otp: str
+    user_id : str
 
 class LoginRequest(BaseModel):
     email: EmailStr
