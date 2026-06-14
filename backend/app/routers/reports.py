@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.database.dependency  import get_db
-from app.models.animal_report import AnimalReport
-from app.schemas.report import AnimalReportCreate
+from database.dependency  import get_db
+from models.animal_report import AnimalReport
+from schemas.report import AnimalReportCreate
 
 
 # Import your JWT dependency

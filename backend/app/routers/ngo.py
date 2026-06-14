@@ -3,9 +3,9 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.database.dependency  import get_db
-from app.models.ngo import NGOInFo 
-from app.schemas.ngo import NGO as NgoRequest 
+from database.dependency  import get_db
+from models.ngo import NGOInFo 
+from schemas.ngo import NGO as NgoRequest 
 
 router = APIRouter(
     prefix="/ngo",

@@ -11,7 +11,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 
-from app.database.base import Base
+from database.base import Base
 
 
 class UserRole(str, Enum):

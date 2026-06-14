@@ -1,9 +1,9 @@
 import random
 from datetime import datetime, timedelta
-from app.service.email_service import send_otp_email
-from app.database.dependency  import get_db
-from app.schemas.otp import SendOTPRequest
-from app.models.otp import OTPVerification
+from service.email_service import send_otp_email
+from database.dependency  import get_db
+from schemas.otp import SendOTPRequest
+from models.otp import OTPVerification
 from fastapi import  Depends
 from sqlalchemy.orm import Session
 

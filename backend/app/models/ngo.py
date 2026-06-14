@@ -11,7 +11,7 @@ from sqlalchemy import (
 
 from datetime import datetime
 
-from app.database.base import Base
+from database.base import Base
 
 
 class NGOInFo(Base):

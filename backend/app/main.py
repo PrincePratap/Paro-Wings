@@ -1,11 +1,11 @@
 from fastapi import FastAPI
-from app.routers.auth import router as auth_routher 
-from app.routers.reports import router as reports_routher
+from routers.auth import router as auth_routher 
+from routers.reports import router as reports_routher
 
-from app.database.base import Base
-from app.database.database import engine
-from app.models.user import User
-from app.routers.ngo import router as ngo_routher
+from database.base import Base
+from database.database import engine
+from models.user import User
+from routers.ngo import router as ngo_routher
 
 app = FastAPI(
     title="Paro Wings API",

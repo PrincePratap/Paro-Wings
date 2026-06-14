@@ -2,19 +2,19 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.database.dependency  import get_db
-from app.schemas.userschemas import UserCreate
-from app.models.user import User 
-from app.models.otp import OTPVerification
+from database.dependency  import get_db
+from schemas.userschemas import UserCreate
+from models.user import User 
+from models.otp import OTPVerification
 
-from app.schemas.otp import   VerifyOTPRequest
+from schemas.otp import   VerifyOTPRequest
 from fastapi import HTTPException
 from datetime import datetime
 
-from app.utils.jwt import create_access_token
-from app.schemas.otp import LoginRequest
-from app.schemas.otp import   SendOTPRequest
-from app.service.otp_service import send_otp
+from utils.jwt import create_access_token
+from schemas.otp import LoginRequest
+from schemas.otp import   SendOTPRequest
+from service.otp_service import send_otp
 
 
 

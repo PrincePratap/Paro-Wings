@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text
 from datetime import datetime
 
-from app.database.base import Base
+from database.base import Base
 
 class AnimalReport(Base):
     __tablename__ = "animal_reports"
