@@ -7,12 +7,12 @@ from schemas.userschemas import UserCreate
 from models.user import User 
 from models.otp import OTPVerification
 
-from schemas.otp import   VerifyOTPRequest
+from schemas.otp import VerifyOTPRequest, LoginRequest
+from schemas.userschemas import GoogleLoginRequest
 from fastapi import HTTPException
 from datetime import datetime
 
 from utils.jwt import create_access_token
-from schemas.otp import LoginRequest
 from schemas.otp import   SendOTPRequest
 from service.otp_service import send_otp
 
@@ -162,4 +162,49 @@ def login(
     return {
         "access_token": token,
         "token_type": "bearer"
+    }
+
+
+@router.post("/google-login")
+def google_login(
+    data: GoogleLoginRequest,
+    db: Session = Depends(get_db)
+):
+
+    user = (
+        db.query(User)
+        .filter(User.email == data.email)
+        .first()
+    )
+
+    if not user:
+        user = User(
+            full_name=data.full_name,
+            email=data.email,
+            phone="",
+            password_hash="GOOGLE_AUTH"
+        )
+
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    token = create_access_token(
+        {
+            "sub": str(user.id),
+            "email": user.email
+        }
+    )
+
+    return {
+        "success": True,
+        "message": "Google login successful",
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": str(user.id),
+            "name": user.full_name,
+            "email": user.email,
+            "photo_url": data.photo_url
+        }
     }

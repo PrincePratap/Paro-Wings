@@ -69,3 +69,44 @@ async def register_ngo(
         "message": "NGO registered successfully",
         "ngo_id": ngo.id
     }
+
+
+@router.get("/")
+async def get_all_ngos(
+    db: Session = Depends(get_db)
+):
+    ngos = db.query(NGOInFo).all()
+
+    return [
+        {
+            "id": ngo.id,
+            "name": ngo.name,
+            "email": ngo.email,
+            "phone": ngo.phone,
+            "city": ngo.city,
+            "state": ngo.state,
+            "country": ngo.country,
+            "latitude": ngo.latitude,
+            "longitude": ngo.longitude,
+            "accepts_rescue_requests": ngo.accepts_rescue_requests
+        }
+        for ngo in ngos
+    ]  
+   
+
+@router.get("/{ngo_id}")
+async def get_ngo(
+    ngo_id: str,
+    db: Session = Depends(get_db)
+):
+    ngo = db.query(NGOInFo).filter(
+        NGOInFo.id == ngo_id
+    ).first()
+
+    if not ngo:
+        raise HTTPException(
+            status_code=404,
+            detail="NGO not found"
+        )
+
+    return ngo

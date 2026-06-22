@@ -1,6 +1,8 @@
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 from uuid import UUID
+
 from pydantic import BaseModel, EmailStr
 
 
@@ -18,11 +20,22 @@ class UserCreate(BaseModel):
     password: str
 
 
+class GoogleLoginRequest(BaseModel):
+    firebase_uid: str
+    full_name: str
+    email: EmailStr
+    photo_url: Optional[str] = None
+
+
 class UserResponse(BaseModel):
     id: UUID
     full_name: str
     email: EmailStr
-    phone: str
+    phone: Optional[str] = None
     role: UserRole
     is_verified: bool
+    photo_url: Optional[str] = None
     created_at: datetime
+
+    class Config:
+        from_attributes = True
