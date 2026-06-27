@@ -34,6 +34,31 @@ def create_adoption(
 
     return adoption
 
+@router.get("/adoptions")
+def get_all_adoptions(
+    city: Optional[str] = Query(None),
+    animal_type: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+
+    query = (
+        db.query(Adoption)
+        .filter(Adoption.adoption_status == "available")
+    )
+
+    if city:
+        query = query.filter(Adoption.city.ilike(f"%{city}%"))
+
+    if animal_type:
+        query = query.filter(
+            Adoption.animal_type.ilike(f"%{animal_type}%")
+        )
+
+    return (
+        query.order_by(
+            Adoption.created_at.desc()
+        ).all()
+    )
 
 
 
@@ -76,31 +101,6 @@ def get_adoption_details(
 
 
 
-@router.get("/")
-def get_all_adoptions(
-    city: Optional[str] = Query(None),
-    animal_type: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
-):
-
-    query = (
-        db.query(Adoption)
-        .filter(Adoption.adoption_status == "available")
-    )
-
-    if city:
-        query = query.filter(Adoption.city.ilike(f"%{city}%"))
-
-    if animal_type:
-        query = query.filter(
-            Adoption.animal_type.ilike(f"%{animal_type}%")
-        )
-
-    return (
-        query.order_by(
-            Adoption.created_at.desc()
-        ).all()
-    )
 
 @router.get("/adoption-requests/{adoption_id}")
 def get_adoption_requests(
