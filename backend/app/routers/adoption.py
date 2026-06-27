@@ -15,6 +15,8 @@ from fastapi import Query
 
 
 
+
+
 router = APIRouter(
     tags=["Adoptions"]
 )
@@ -34,6 +36,9 @@ def create_adoption(
 
     return adoption
 
+
+
+
 @router.get("/adoptions")
 def get_all_adoptions(
     city: Optional[str] = Query(None),
@@ -47,18 +52,27 @@ def get_all_adoptions(
     )
 
     if city:
-        query = query.filter(Adoption.city.ilike(f"%{city}%"))
+        query = query.filter(
+            Adoption.city.ilike(f"%{city}%")
+        )
 
     if animal_type:
         query = query.filter(
             Adoption.animal_type.ilike(f"%{animal_type}%")
         )
 
-    return (
+    adoptions = (
         query.order_by(
             Adoption.created_at.desc()
         ).all()
     )
+
+    return {
+        "success": True,
+        "message": "Adoptions fetched successfully",
+        "total": len(adoptions),
+        "data": adoptions
+    }
 
 
 
