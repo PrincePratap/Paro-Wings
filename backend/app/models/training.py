@@ -4,7 +4,7 @@ import uuid
 from sqlalchemy import Column, String, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 
-from app.database import Base
+from database.base import Base
 
 
 class TrainingAnimal(Base):

@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database.dependency import get_db
-from app.models.training import TrainingAnimal
-from app.schemas.training import (
+from models.training import TrainingAnimal
+from schemas.training import (
     TrainingAnimalCreate,
     TrainingAnimalUpdate,
     TrainingAnimalResponse,

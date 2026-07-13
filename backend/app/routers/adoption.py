@@ -92,7 +92,7 @@ def create_request(
     return adoption_request
 
 
-@router.get("/{adoption_id}")
+@router.post("/{adoption_id}")
 def get_adoption_details(
     adoption_id: UUID,
     db: Session = Depends(get_db)
