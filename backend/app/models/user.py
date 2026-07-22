@@ -1,6 +1,8 @@
 from datetime import datetime
 from enum import Enum
 from uuid import uuid4
+from database.base import Base
+
 
 from sqlalchemy import (
     Column,
@@ -11,7 +13,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 
-from database.base import Base
 
 
 class UserRole(str, Enum):

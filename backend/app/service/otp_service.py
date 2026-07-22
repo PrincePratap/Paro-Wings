@@ -1,19 +1,20 @@
 import random
 from datetime import datetime, timedelta
-from service.email_service import send_otp_email
-from database.dependency  import get_db
-from schemas.otp import SendOTPRequest
-from models.otp import OTPVerification
-from fastapi import  Depends
+from uuid import uuid4
+
 from sqlalchemy.orm import Session
 
-
-
-
+from models.otp import OTPVerification
+from schemas.otp import SendOTPRequest
+from service.email_service import send_otp_email
 
 
 def generate_otp():
     return str(random.randint(100000, 999999))
+
+
+def generate_pending_user_id() -> str:
+    return str(uuid4())
 
 
 async def send_otp(
@@ -53,7 +54,10 @@ async def send_otp(
 
     return {
         "success": True,
-        "message": "OTP sent successfully"
+        "message": "OTP sent successfully",
+        "data": {
+            "user_id": generate_pending_user_id()
+        }
     }
 
 

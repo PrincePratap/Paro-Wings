@@ -1,15 +1,18 @@
+from pathlib import Path
+
 from fastapi import FastAPI
-from routers.auth import router as auth_routher 
-from routers.reports import router as reports_routher
+from fastapi.staticfiles import StaticFiles
 
 from database.base import Base
 from database.database import engine
 from models.user import User
-from routers.ngo import router as ngo_routher
 from routers.adoption import router as adoption_router
+from routers.auth import router as auth_routher
 from routers.my_animal import router as my_animal_router
+from routers.ngo import router as ngo_routher
+from routers.reports import router as reports_routher
 from routers.training import router as training_animals_router
-
+from routers.upload import router as upload_router
 
 app = FastAPI(
     title="Paro Wings API",
@@ -22,7 +25,10 @@ app.include_router(ngo_routher)
 app.include_router(adoption_router)
 app.include_router(my_animal_router)
 app.include_router(training_animals_router)
+app.include_router(upload_router)
 
+UPLOAD_ROOT = Path(__file__).resolve().parent.parent / "uploads"
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_ROOT)), name="uploads")
 
 
 @app.get("/")

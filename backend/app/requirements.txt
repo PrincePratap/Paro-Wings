@@ -40,7 +40,7 @@ python-jose[cryptography]
 # Used for JWT tokens
 # Example: Login authentication
 
-passlib[bcrypt]
+passlib[bcrypt]==1.7.4
 # Password hashing library
 # Converts passwords into secure hashes before storing in database
 
@@ -81,5 +81,6 @@ python-dotenv
 
 
 PyJWT
-passlib[bcrypt]
 aiosmtplib
+bcrypt==4.0.1
+passlib[bcrypt]==1.7.4

@@ -1,17 +1,20 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Optional
+from uuid import UUID, uuid4
 
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
+from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from database.dependency import get_db
 from models.otp import OTPVerification
 from models.user import User
 from schemas.otp import LoginRequest, VerifyOTPRequest
 from schemas.userschemas import GoogleLoginRequest, UserCreate
 from service.email_service import send_otp_email
-from utils.jwt import create_access_token
+from utils.jwt import ALGORITHM, SECRET_KEY, create_access_token
 from utils.security import hash_password, verify_password
 
 logger = logging.getLogger(__name__)
@@ -39,9 +42,17 @@ def find_user_by_phone(session: Session, phone: str) -> Optional[User]:
     return result.scalar_one_or_none()
 
 
+def find_user_by_id(session: Session, user_id: UUID) -> Optional[User]:
+    return session.get(User, user_id)
+
+
 def generate_testing_otp() -> str:
     """Testing only. Remove before production."""
     return "123456"
+
+
+def generate_pending_user_id() -> str:
+    return str(uuid4())
 
 
 def store_otp(session: Session, email: str, otp: str) -> OTPVerification:
@@ -151,6 +162,28 @@ def serialize_user(user: User) -> dict[str, Any]:
     }
 
 
+def get_current_user(request: Request, session: Session = Depends(get_db)) -> User:
+    authorization = request.headers.get("Authorization")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token.")
+
+    token = authorization.split(" ", 1)[1].strip()
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token.") from exc
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token.")
+
+    user = find_user_by_id(session, UUID(str(user_id)))
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    return user
+
+
 async def register_user(session: Session, user_data: UserCreate) -> dict[str, Any]:
     logger.info("Registration started")
 
@@ -173,47 +206,53 @@ async def register_user(session: Session, user_data: UserCreate) -> dict[str, An
     except Exception:
         logger.warning("OTP email delivery failed; continuing in testing mode")
 
-    response = success_response("OTP sent successfully", {"otp": otp})
-    response["otp"] = otp
-    return response
-
-
-def verify_and_create_user(session: Session, data: VerifyOTPRequest) -> dict[str, Any]:
-    email = str(data.email).strip().lower()
-    otp = data.otp.strip()
-    full_name = data.full_name.strip()
-    phone = data.phone.strip()
-
-    otp_record = verify_otp(session, email, otp)
-
-    if find_user_by_email(session, email):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
-
-    if find_user_by_phone(session, phone):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Phone already registered")
-
     try:
         user = create_user(
             session,
             full_name=full_name,
             email=email,
             phone=phone,
-            password=data.password,
+            password=user_data.password,
             commit=False,
         )
-        delete_otp(session, email, commit=False)
         session.commit()
         session.refresh(user)
     except Exception:
         session.rollback()
         raise
 
-    logger.info("User created")
+    return success_response("OTP sent successfully", {"user_id": str(user.id)})
+
+
+def verify_and_create_user(session: Session, data: VerifyOTPRequest) -> dict[str, Any]:
+    otp = data.otp.strip()
+    user = find_user_by_id(session, data.user_id)
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pending user not found")
+
+    verify_otp(session, user.email, otp)
+
+    try:
+        user.is_verified = True
+        delete_otp(session, user.email, commit=False)
+        session.commit()
+        session.refresh(user)
+    except Exception:
+        session.rollback()
+        raise
+
+    logger.info("User verified")
     token = generate_jwt(user)
-    response = success_response("OTP verified successfully", {"token": token, "user": serialize_user(user)})
-    response["token"] = token
-    response["user"] = serialize_user(user)
-    return response
+    return success_response(
+        "OTP verified successfully.",
+        {
+            "full_name": user.full_name,
+            "email": user.email,
+            "phone": user.phone,
+            "token": token,
+        },
+    )
 
 
 def authenticate_user(session: Session, data: LoginRequest) -> dict[str, Any]:

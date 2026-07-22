@@ -4,9 +4,15 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from database.dependency import get_db
-from schemas.otp import LoginRequest, VerifyOTPRequest
-from schemas.userschemas import GoogleLoginRequest, UserCreate
-from service.auth_service import authenticate_user, google_login_user, register_user, verify_and_create_user
+from schemas.otp import LoginRequest, VerifyOTPRequest, VerifyOTPResponse
+from schemas.userschemas import GoogleLoginRequest, UserCreate, UserProfileResponse
+from service.auth_service import (
+    authenticate_user,
+    get_current_user,
+    google_login_user,
+    register_user,
+    verify_and_create_user,
+)
 
 router = APIRouter(
     prefix="/auth",
@@ -35,10 +41,38 @@ async def register(user: UserCreate, db: Session = Depends(get_db)) -> dict:
         )
 
 
-@router.post("/verify-otp")
+@router.post("/verify-otp", response_model=VerifyOTPResponse)
 def verify_otp(data: VerifyOTPRequest, db: Session = Depends(get_db)) -> dict:
     try:
         return verify_and_create_user(db, data)
+    except HTTPException as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"success": False, "message": exc.detail},
+        )
+    except Exception:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "message": "Internal server error"},
+        )
+
+
+@router.get("/me", response_model=UserProfileResponse)
+def get_me(current_user=Depends(get_current_user)) -> dict:
+    try:
+        return {
+            "success": True,
+            "message": "User profile fetched successfully.",
+            "data": {
+                "id": current_user.id,
+                "full_name": current_user.full_name,
+                "email": current_user.email,
+                "phone": current_user.phone,
+                "role": current_user.role,
+                "is_verified": current_user.is_verified,
+                "created_at": current_user.created_at,
+            },
+        }
     except HTTPException as exc:
         return JSONResponse(
             status_code=exc.status_code,

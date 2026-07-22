@@ -76,3 +76,16 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UserProfileResponse(BaseModel):
+    id: UUID
+    full_name: str
+    email: EmailStr
+    phone: Optional[str] = None
+    role: UserRole
+    is_verified: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
