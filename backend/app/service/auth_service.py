@@ -201,10 +201,10 @@ async def register_user(session: Session, user_data: UserCreate) -> dict[str, An
     store_otp(session, email, otp)
     logger.info("OTP generated")
 
-    try:
-        await send_otp_email(email, otp)
-    except Exception:
-        logger.warning("OTP email delivery failed; continuing in testing mode")
+    # try:
+    #     await send_otp_email(email, otp)
+    # except Exception:
+    #     logger.warning("OTP email delivery failed; continuing in testing mode")
 
     try:
         user = create_user(
