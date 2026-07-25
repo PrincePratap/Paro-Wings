@@ -27,7 +27,7 @@ app.include_router(my_animal_router)
 app.include_router(training_animals_router)
 app.include_router(upload_router)
 
-UPLOAD_ROOT = Path(__file__).resolve().parent.parent / "uploads"
+UPLOAD_ROOT = Path(__file__).resolve().parent / "uploads"
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_ROOT)), name="uploads")
 
 

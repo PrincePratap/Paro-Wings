@@ -3,7 +3,7 @@ from jose import jwt
 
 SECRET_KEY = "paro-wings-super-secret-key-2026"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 365
 
 
 def create_access_token(data: dict):

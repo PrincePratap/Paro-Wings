@@ -270,9 +270,9 @@ def authenticate_user(session: Session, data: LoginRequest) -> dict[str, Any]:
     token = generate_jwt(user)
     logger.info("Login success")
     response = success_response("Login successful", {"token": token, "user": serialize_user(user)})
-    response["access_token"] = token
-    response["token_type"] = "bearer"
-    response["user"] = serialize_user(user)
+    # response["access_token"] = token
+    # response["token_type"] = "bearer"
+    # response["user"] = serialize_user(user)
     return response
 
 
