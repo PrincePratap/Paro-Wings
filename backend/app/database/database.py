@@ -1,8 +1,10 @@
+from unittest.mock import Base
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import os
 from dotenv import load_dotenv
-
+from database.base import Base
 
 
 load_dotenv()
@@ -17,3 +19,4 @@ SessionLocal = sessionmaker(
     autoflush=False,
     bind=engine
 )
+Base.metadata.create_all(bind=engine)

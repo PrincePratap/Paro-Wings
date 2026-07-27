@@ -1,9 +1,16 @@
 from datetime import datetime, timedelta
 from jose import jwt
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt
 
 SECRET_KEY = "paro-wings-super-secret-key-2026"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 365
+
+
+security = HTTPBearer()
+
 
 
 def create_access_token(data: dict):
@@ -25,3 +32,4 @@ def create_access_token(data: dict):
     )
 
     return encoded_jwt
+

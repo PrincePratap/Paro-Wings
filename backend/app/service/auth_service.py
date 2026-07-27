@@ -17,6 +17,14 @@ from service.email_service import send_otp_email
 from utils.jwt import ALGORITHM, SECRET_KEY, create_access_token
 from utils.security import hash_password, verify_password
 
+
+
+
+
+from models.ngo import NGOInfo
+from schemas.ngo import  NGOOwnerRegisterRequest
+
+
 logger = logging.getLogger(__name__)
 
 OTP_TTL_MINUTES = 5
@@ -224,6 +232,9 @@ async def register_user(session: Session, user_data: UserCreate) -> dict[str, An
     return success_response("OTP sent successfully", {"user_id": str(user.id)})
 
 
+
+
+
 def verify_and_create_user(session: Session, data: VerifyOTPRequest) -> dict[str, Any]:
     otp = data.otp.strip()
     user = find_user_by_id(session, data.user_id)
@@ -270,9 +281,7 @@ def authenticate_user(session: Session, data: LoginRequest) -> dict[str, Any]:
     token = generate_jwt(user)
     logger.info("Login success")
     response = success_response("Login successful", {"token": token, "user": serialize_user(user)})
-    # response["access_token"] = token
-    # response["token_type"] = "bearer"
-    # response["user"] = serialize_user(user)
+  
     return response
 
 
@@ -304,3 +313,112 @@ def google_login_user(session: Session, data: GoogleLoginRequest) -> dict[str, A
     response["token_type"] = "bearer"
     response["user"] = serialize_user(user)
     return response
+
+
+# NGO  
+
+
+
+
+def serialize_ngo(
+    ngo: NGOInfo
+) -> dict[str, Any]:
+
+    return {
+        "id": str(ngo.id),
+        "name": ngo.name,
+        "email": ngo.email,
+        "phone": ngo.phone,
+        "city": ngo.city,
+        "state": ngo.state,
+        "status": ngo.status,
+        "is_verified": ngo.is_verified,
+        "is_active": ngo.is_active,
+        "accepts_rescue_requests": ngo.accepts_rescue_requests,
+        "created_at": ngo.created_at.isoformat()
+    }
+
+
+
+
+
+def find_ngo_by_email(
+    session: Session,
+    email: str
+) -> Optional[NGOInfo]:
+
+    statement = select(NGOInfo).where(
+        NGOInfo.email == email
+    )
+
+    result = session.execute(statement)
+
+    return result.scalar_one_or_none()
+
+async def register_ngo_owner(
+    session: Session,
+    ngo_data: NGOOwnerRegisterRequest
+) -> dict[str, Any]:
+
+    logger.info("NGO Owner registration started")
+
+    full_name = ngo_data.full_name.strip()
+    email = str(ngo_data.email).strip().lower()
+    phone = ngo_data.phone.strip()
+    ngo_name = ngo_data.ngo_name.strip()
+
+    # Check if NGO Owner email already exists
+    if find_ngo_by_email(session, email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered"
+        )
+
+    # Generate OTP
+    otp = generate_testing_otp()
+
+    store_otp(session, email, otp)
+
+    logger.info("OTP generated")
+
+    # Send Email (Production)
+    # try:
+    #     await send_otp_email(email, otp)
+    # except Exception:
+    #     logger.warning("OTP email delivery failed")
+
+    try:
+
+        ngo = NGOInfo(
+
+            name=ngo_name,
+
+            email=email,
+            phone=phone,
+
+            owner_name=full_name,
+            owner_email=email,
+            owner_phone=phone,
+            password_hash=hash_password(ngo_data.password),
+            status="pending",
+            is_verified=False,
+            is_active=True,
+            accepts_rescue_requests=True
+
+        )
+
+        session.add(ngo)
+        session.commit()
+        session.refresh(ngo)
+
+    except Exception:
+        session.rollback()
+        raise
+
+    return success_response(
+        "OTP sent successfully",
+        {
+            "ngo_id": str(ngo.id)
+        }
+    )
+

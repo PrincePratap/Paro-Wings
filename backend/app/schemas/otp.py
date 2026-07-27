@@ -46,3 +46,14 @@ class LoginRequest(BaseModel):
         return str(value).strip().lower()
 
 
+
+
+class VerifyNGOOTPRequest(BaseModel):
+    ngo_id: UUID
+    otp: str
+
+
+class VerifyNGOOTPResponse(BaseModel):
+    success: bool
+    message: str
+    data: dict

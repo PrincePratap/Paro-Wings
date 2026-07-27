@@ -1,0 +1,327 @@
+from typing import Optional, Any
+from uuid import UUID
+import logging
+import traceback
+
+
+from fastapi import Depends, HTTPException, Request, status
+from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from database.dependency import get_db
+from models.ngo import NGOInfo
+from schemas.ngo import UpdateNGOLocationData , UpdateNGOLocationRequest  , NGOLoginRequest
+from utils.jwt import SECRET_KEY, ALGORITHM, create_access_token
+from utils.security import hash_password, verify_password
+from service.auth_service import generate_testing_otp, store_otp, success_response, error_response
+from passlib.context import CryptContext
+from service.email_service import send_otp_email
+from utils.jwt import ALGORITHM, SECRET_KEY, create_access_token
+from utils.security import hash_password, verify_password
+import logging
+from datetime import datetime, timedelta
+from typing import Any, Optional
+from uuid import UUID, uuid4
+
+from fastapi import Depends, HTTPException, Request, status
+from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from database.dependency import get_db
+from models.otp import OTPVerification
+from models.user import User
+from schemas.otp import LoginRequest, VerifyOTPRequest
+from schemas.userschemas import GoogleLoginRequest, UserCreate
+from service.email_service import send_otp_email
+from utils.jwt import ALGORITHM, SECRET_KEY, create_access_token
+from utils.security import hash_password, verify_password
+from service.auth_service import verify_otp ,delete_otp
+
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+
+logger = logging.getLogger(__name__)
+
+
+def find_ngo_by_email(
+    session: Session,
+    email: str
+) -> Optional[NGOInfo]:
+
+    statement = select(NGOInfo).where(
+        NGOInfo.email == email
+    )
+
+    result = session.execute(statement)
+
+    return result.scalar_one_or_none()
+
+def serialize_ngo(ngo: NGOInfo) -> dict:
+    return {
+        "ngo_id": ngo.id,
+        "ngo_name": ngo.name,
+        "owner_name": ngo.owner_name,
+        "owner_email": ngo.owner_email,
+        "owner_phone": ngo.owner_phone,
+        "total_volunteers": ngo.total_volunteers,
+        "is_verified": ngo.is_verified,
+        "is_active": ngo.is_active
+    }
+
+
+
+def generate_ngo_jwt(ngo: NGOInfo) -> str:
+    return create_access_token(
+        {
+            "sub": str(ngo.id),
+            "email": ngo.email,
+            "type": "ngo"
+        }
+    )
+
+
+def find_ngo_by_id(
+    session: Session,
+    ngo_id: str
+) -> Optional[NGOInfo]:
+
+    return session.query(NGOInfo).filter(
+        NGOInfo.id == ngo_id
+    ).first()
+
+
+
+def update_ngo_location(
+    session: Session,
+    current_ngo: NGOInfo,
+    data: UpdateNGOLocationRequest
+):
+    ngo = session.query(NGOInfo).filter(
+        NGOInfo.id == current_ngo.id
+    ).first()
+
+    if ngo is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="NGO not found."
+        )
+
+    ngo.address_line_1 = data.address_line_1
+    ngo.landmark = data.landmark
+    ngo.city = data.city
+    ngo.district = data.district
+    ngo.state = data.state
+    ngo.country = data.country
+    ngo.postal_code = data.postal_code
+
+    session.commit()
+    session.refresh(ngo)
+
+    return {
+        "success": True,
+        "message": "NGO location updated successfully.",
+        "data": {
+            "ngo_id": ngo.id,
+            "owner": {
+                "owner_name": ngo.owner_name,
+                "owner_email": ngo.owner_email,
+                "owner_phone": ngo.owner_phone
+            },
+            "address_line_1": ngo.address_line_1,
+            "landmark": ngo.landmark,
+            "city": ngo.city,
+            "district": ngo.district,
+            "state": ngo.state,
+            "country": ngo.country,
+            "postal_code": ngo.postal_code
+        }
+    }
+
+
+def get_current_ngo(
+    request: Request,
+    session: Session = Depends(get_db)
+) -> NGOInfo:
+    authorization = request.headers.get("Authorization")
+
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token."
+        )
+
+    token = authorization.split(" ", 1)[1].strip()
+
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+    except JWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token."
+        ) from exc
+
+    ngo_id = payload.get("sub")
+
+    if not ngo_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token."
+        )
+
+    ngo = find_ngo_by_id(session, str(ngo_id))
+    # If your NGO id column is PostgreSQL UUID, use:
+    # ngo = find_ngo_by_id(session, UUID(str(ngo_id)))
+
+    if not ngo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="NGO not found."
+        )
+
+    return ngo
+
+def login_ngo(
+    session: Session,
+    data: NGOLoginRequest
+):
+    ngo = session.query(NGOInfo).filter(
+        NGOInfo.email == data.email.lower().strip()
+    ).first()
+
+    if not ngo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="NGO not found."
+        )
+
+    if not ngo.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please verify your email first."
+        )
+
+    if not pwd_context.verify(data.password, ngo.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password."
+        )
+
+    token = generate_ngo_jwt(ngo)
+
+    return {
+        "success": True,
+        "message": "Login successful.",
+        "data": {
+            "ngo_id": ngo.id,
+            "ngo_name": ngo.name,
+            "owner_name": ngo.owner_name,
+            "owner_email": ngo.owner_email,
+            "owner_phone": ngo.owner_phone,
+            "total_volunteers": ngo.total_volunteers,
+            "access_token": token,
+            "token_type": "bearer"
+        }
+    }
+
+def authenticate_ngo(
+    session: Session,
+    data: NGOLoginRequest
+) -> dict[str, Any]:
+
+    email = str(data.email).strip().lower()
+
+    ngo = find_ngo_by_email(session, email)
+
+    if not ngo:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"
+        )
+
+    if not verify_password(data.password, ngo.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"
+        )
+
+    if not ngo.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email first."
+        )
+
+    token = generate_ngo_jwt(ngo)
+
+    return success_response(
+    "Login successful",
+    {
+        "ngo_id": str(ngo.id),
+        "ngo_name": ngo.name,
+        "owner_name": ngo.owner_name,
+        "owner_email": ngo.owner_email,
+        "owner_phone": ngo.owner_phone,
+        "total_volunteers": ngo.total_volunteers,
+        "access_token": token,
+        "token_type": "bearer"
+    }
+)
+
+def verify_and_create_ngo(
+    session: Session,
+    data: VerifyOTPRequest
+) -> dict[str, Any]:
+
+    otp = data.otp.strip()
+
+    ngo = find_ngo_by_id(session, str(data.ngo_id))
+
+    if not ngo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pending NGO not found"
+        )
+
+    verify_otp(session, ngo.email, otp)
+
+    try:
+        ngo.is_verified = True
+
+        delete_otp(
+            session,
+            ngo.email,
+            commit=False
+        )
+
+        session.commit()
+        session.refresh(ngo)
+
+    except Exception:
+        session.rollback()
+        raise
+
+    logger.info("NGO verified")
+
+    token = generate_ngo_jwt(ngo)
+
+    return success_response(
+    "Login successful",
+    {
+        "ngo_id": ngo.id,
+        "ngo_name": ngo.name,
+        "owner_name": ngo.owner_name,
+        "owner_email": ngo.owner_email,
+        "owner_phone": ngo.owner_phone,
+        "total_volunteers": ngo.total_volunteers,
+        "is_verified": ngo.is_verified,
+        "is_active": ngo.is_active,
+        "access_token": token
+    }
+)
