@@ -40,6 +40,16 @@ from utils.security import hash_password, verify_password
 from service.auth_service import verify_otp ,delete_otp
 
 
+from models.volunteer_request import VolunteerRequest
+from schemas.volunteer_request import (
+    VolunteerRequestActionRequest,
+    VolunteerRequestAction,
+)
+from service.auth_service import success_response
+from models.ngo import NGOInfo
+from models.volunteer import Volunteer
+from models.volunteer_request import VolunteerRequest
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -325,3 +335,121 @@ def verify_and_create_ngo(
         "access_token": token
     }
 )
+
+def get_volunteer_requests(
+    session: Session,
+    current_ngo: NGOInfo
+) -> dict[str, Any]:
+
+    requests = (
+        session.query(VolunteerRequest)
+        .filter(
+            VolunteerRequest.ngo_id == current_ngo.id,
+            VolunteerRequest.status == "pending"
+        )
+        .order_by(VolunteerRequest.created_at.desc())
+        .all()
+    )
+
+    data = []
+
+    for request in requests:
+        data.append({
+            "request_id": request.id,
+            "volunteer_id": request.volunteer_id,
+            "volunteer_name": request.volunteer_name,
+            "volunteer_email": request.volunteer_email,
+            "volunteer_phone": request.volunteer_phone,
+            "ngo_id": request.ngo_id,
+            "ngo_name": request.ngo_name,
+            "message": request.message,
+            "experience": request.experience,
+            "available_days": request.available_days,
+            "preferred_role": request.preferred_role,
+            "status": request.status,
+            "created_at": request.created_at
+        })
+
+    return success_response(
+        "Volunteer requests fetched successfully.",
+        data
+    )
+
+def manage_volunteer_request_service(
+    session: Session,
+    current_ngo: NGOInfo,
+    request_id: str,
+    body: VolunteerRequestActionRequest,
+):
+    # Find request
+    volunteer_request = (
+        session.query(VolunteerRequest)
+        .filter(VolunteerRequest.id == request_id)
+        .first()
+    )
+
+    if not volunteer_request:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Volunteer request not found."
+        )
+
+    # Verify request belongs to current NGO
+    if volunteer_request.ngo_id != current_ngo.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to perform this action."
+        )
+
+    # Request already processed
+    if volunteer_request.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Request is already {volunteer_request.status}."
+        )
+
+    # Find volunteer
+    volunteer = (
+        session.query(Volunteer)
+        .filter(Volunteer.id == volunteer_request.volunteer_id)
+        .first()
+    )
+
+    if not volunteer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Volunteer not found."
+        )
+
+    # Approve
+    if body.action == VolunteerRequestAction.APPROVE:
+
+        volunteer_request.status = "approved"
+
+        volunteer.ngo_id = current_ngo.id
+
+        current_ngo.total_volunteers += 1
+
+        message = "Volunteer request approved successfully."
+
+    # Reject
+    else:
+
+        volunteer_request.status = "rejected"
+        volunteer_request.rejection_reason = body.rejection_reason
+
+        message = "Volunteer request rejected successfully."
+
+    volunteer_request.reviewed_by = current_ngo.id
+    volunteer_request.reviewed_at = datetime.utcnow()
+
+    session.commit()
+    session.refresh(volunteer_request)
+
+    return success_response(
+        message,
+        {
+            "request_id": str(volunteer_request.id),
+            "status": volunteer_request.status
+        }
+    )

@@ -31,10 +31,24 @@ from service.ngo_service import (
     get_current_ngo,
     login_ngo,
     authenticate_ngo,
-    verify_and_create_ngo
+    verify_and_create_ngo,
+    get_volunteer_requests
 )
 from passlib.context import CryptContext
+
+from models.volunteer_request import VolunteerRequest
 import traceback
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from models.ngo import NGOInfo
+from schemas.volunteer_request import VolunteerRequestActionRequest
+from service.ngo_service import (
+    get_current_ngo,
+    manage_volunteer_request_service,
+)
+
 
 
 
@@ -130,4 +144,50 @@ def login(
     except Exception as e:
         traceback.print_exc()
     raise
+
+@router.get("/volunteer-requests")
+def volunteer_requests(
+    current_ngo: NGOInfo = Depends(get_current_ngo),
+    db: Session = Depends(get_db)
+):
+    try:
+        return get_volunteer_requests(
+            db,
+            current_ngo
+        )
+
+    except HTTPException as exc:
+        raise exc
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+@router.patch("/volunteer-request/{request_id}")
+def manage_volunteer_request(
+    request_id: str,
+    body: VolunteerRequestActionRequest,
+    current_ngo: NGOInfo = Depends(get_current_ngo),
+    db: Session = Depends(get_db),
+):
+    try:
+        return manage_volunteer_request_service(
+            session=db,
+            current_ngo=current_ngo,
+            request_id=request_id,
+            body=body,
+        )
+
+    except HTTPException as exc:
+        raise exc
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
  

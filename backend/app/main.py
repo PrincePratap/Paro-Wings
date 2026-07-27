@@ -14,6 +14,7 @@ from routers.reports import router as reports_routher
 from routers.training import router as training_animals_router
 from routers.upload import router as upload_router
 from routers.volunteer import router as volunteer
+from routers.volunteer_request import router as volunteer_request_router
 
 app = FastAPI(
     title="Paro Wings API",
@@ -28,6 +29,7 @@ app.include_router(my_animal_router)
 app.include_router(training_animals_router)
 app.include_router(upload_router)
 app.include_router(volunteer)
+app.include_router(volunteer_request_router)
 
 UPLOAD_ROOT = Path(__file__).resolve().parent / "uploads"
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_ROOT)), name="uploads")
