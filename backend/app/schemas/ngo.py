@@ -42,7 +42,6 @@ class NGOOwnerRegisterRequest(BaseModel):
     email: EmailStr
     phone: str
     password: str
-
     ngo_name: str
 
     @field_validator("full_name")

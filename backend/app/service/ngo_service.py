@@ -16,7 +16,13 @@ from schemas.ngo import(
      NGOLoginRequest)
 from utils.jwt import SECRET_KEY, ALGORITHM, create_access_token
 from utils.security import hash_password, verify_password
-from service.auth_service import generate_testing_otp, store_otp, success_response, error_response
+from service.auth_service import (
+    generate_account_token,
+    generate_testing_otp,
+    store_otp,
+    success_response,
+    error_response,
+)
 from passlib.context import CryptContext
 from service.email_service import send_otp_email
 from utils.jwt import ALGORITHM, SECRET_KEY, create_access_token
@@ -85,12 +91,11 @@ def serialize_ngo(ngo: NGOInfo) -> dict:
 
 
 def generate_ngo_jwt(ngo: NGOInfo) -> str:
-    return create_access_token(
-        {
-            "sub": str(ngo.id),
-            "email": ngo.email,
-            "type": "ngo"
-        }
+    return generate_account_token(
+        subject=str(ngo.id),
+        email=ngo.email or "",
+        role="ngo_admin",
+        account_type="ngo",
     )
 
 

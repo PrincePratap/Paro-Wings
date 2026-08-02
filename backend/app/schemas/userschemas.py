@@ -12,6 +12,7 @@ class UserRole(str, Enum):
     RESCUER = "rescuer"
     NGO_ADMIN = "ngo_admin"
     SUPER_ADMIN = "super_admin"
+    VOlUNTEER = "volunteer"
 
 
 class UserCreate(BaseModel):
@@ -19,6 +20,8 @@ class UserCreate(BaseModel):
     email: EmailStr
     phone: str
     password: str
+    role: UserRole = UserRole.CITIZEN
+    ngo_name: Optional[str] = None
 
     @field_validator("full_name")
     @classmethod

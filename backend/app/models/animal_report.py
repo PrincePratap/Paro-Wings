@@ -32,8 +32,8 @@ class AnimalReport(Base):
     state = Column(String(100))
     postal_code = Column(String(20))
 
-    image_urls = Column(JSON)
-
+    image_url = Column(String(500), nullable=True)
+    
     anonymous_report = Column(Boolean, default=False)
 
     status = Column(String(50), default="Pending")

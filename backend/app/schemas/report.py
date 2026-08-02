@@ -1,7 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel
 
 
 class AnimalReportCreate(BaseModel):
@@ -16,7 +15,7 @@ class AnimalReportCreate(BaseModel):
     longitude: float
 
     address_line_1: str
-    locality: str
+    locality: str 
     city: str
     state: str
     postal_code: str

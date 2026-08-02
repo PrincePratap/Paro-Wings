@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from database.dependency import get_db
-from schemas.otp import LoginRequest, VerifyOTPRequest, VerifyOTPResponse
+from schemas.otp import LoginRequest, LoginResponse, VerifyOTPRequest, VerifyOTPResponse
 from schemas.userschemas import GoogleLoginRequest, UserCreate, UserProfileResponse
 from service.auth_service import (
     authenticate_user,
@@ -13,6 +13,8 @@ from service.auth_service import (
     register_user,
     verify_and_create_user,
 )
+import traceback
+
 
 router = APIRouter(
     prefix="/auth",
@@ -25,19 +27,30 @@ def test_auth() -> dict[str, str]:
     return {"message": "Auth Router Working"}
 
 
+
 @router.post("/register")
 async def register(user: UserCreate, db: Session = Depends(get_db)) -> dict:
     try:
         return await register_user(db, user)
+
     except HTTPException as exc:
         return JSONResponse(
             status_code=exc.status_code,
-            content={"success": False, "message": exc.detail},
+            content={
+                "success": False,
+                "message": exc.detail,
+            },
         )
-    except Exception:
+
+    except Exception as e:
+        traceback.print_exc()
+
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"success": False, "message": "Internal server error"},
+            content={
+                "success": False,
+                "message": str(e)
+            },
         )
 
 
@@ -85,7 +98,7 @@ def get_me(current_user=Depends(get_current_user)) -> dict:
         )
 
 
-@router.post("/login")
+@router.post("/login", response_model=LoginResponse)
 def login(data: LoginRequest, db: Session = Depends(get_db)) -> dict:
     try:
         return authenticate_user(db, data)

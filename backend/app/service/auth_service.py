@@ -133,12 +133,14 @@ def create_user(
     email: str,
     phone: str,
     password: str,
+    role: str,
     commit: bool = True,
 ) -> User:
     user = User(
         full_name=full_name,
         email=email,
         phone=phone,
+        role = role,
         password_hash=hash_password(password),
     )
     session.add(user)
@@ -154,8 +156,46 @@ def create_user(
     return user
 
 
+def generate_account_token(*, subject: str, email: str, role: str, account_type: str) -> str:
+    return create_access_token(
+        {
+            "sub": subject,
+            "email": email,
+            "role": role,
+            "account_type": account_type,
+        }
+    )
+
+
 def generate_jwt(user: User) -> str:
-    return create_access_token({"sub": str(user.id), "email": user.email})
+    role = user.role.value if getattr(user, "role", None) else "citizen"
+    return generate_account_token(
+        subject=str(user.id),
+        email=user.email,
+        role=role,
+        account_type="user",
+    )
+
+
+def build_login_payload(
+    *,
+    account_id: str,
+    email: str,
+    name: str,
+    phone: str,
+    role: str,
+    account_type: str,
+) -> dict[str, Any]:
+    return {
+        "id": account_id,
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "role": role,
+        "account_type": account_type,
+        "access_token": "",
+        "token_type": "bearer",
+    }
 
 
 def serialize_user(user: User) -> dict[str, Any]:
@@ -168,6 +208,28 @@ def serialize_user(user: User) -> dict[str, Any]:
         "is_verified": user.is_verified,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }
+
+
+def serialize_user_login(user: User) -> dict[str, Any]:
+    return build_login_payload(
+        account_id=str(user.id),
+        email=user.email,
+        name=user.full_name,
+        phone=user.phone,
+        role=user.role.value if getattr(user, "role", None) else "citizen",
+        account_type="user",
+    )
+
+
+def serialize_ngo_login(ngo: NGOInfo) -> dict[str, Any]:
+    return build_login_payload(
+        account_id=str(ngo.id),
+        email=ngo.email or "",
+        name=ngo.name,
+        phone=ngo.phone or "",
+        role="ngo_admin",
+        account_type="ngo",
+    )
 
 
 def get_current_user(request: Request, session: Session = Depends(get_db)) -> User:
@@ -198,8 +260,9 @@ async def register_user(session: Session, user_data: UserCreate) -> dict[str, An
     full_name = user_data.full_name.strip()
     email = str(user_data.email).strip().lower()
     phone = user_data.phone.strip()
+    role_name = str(user_data.role.value if getattr(user_data.role, "value", None) is not None else user_data.role)
 
-    if find_user_by_email(session, email):
+    if find_user_by_email(session, email) or find_ngo_by_email(session, email):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
     if find_user_by_phone(session, phone):
@@ -209,10 +272,19 @@ async def register_user(session: Session, user_data: UserCreate) -> dict[str, An
     store_otp(session, email, otp)
     logger.info("OTP generated")
 
-    # try:
-    #     await send_otp_email(email, otp)
-    # except Exception:
-    #     logger.warning("OTP email delivery failed; continuing in testing mode")
+    if role_name == "ngo_admin":
+        ngo = create_ngo_account(
+            session,
+            full_name=full_name,
+            email=email,
+            phone=phone,
+            password=user_data.password,
+            ngo_name=user_data.ngo_name.strip() if user_data.ngo_name else full_name,
+            commit=False,
+        )
+        session.commit()
+        session.refresh(ngo)
+        return success_response("OTP sent successfully.", {"id": str(ngo.id), "role": role_name})
 
     try:
         user = create_user(
@@ -221,6 +293,7 @@ async def register_user(session: Session, user_data: UserCreate) -> dict[str, An
             email=email,
             phone=phone,
             password=user_data.password,
+            role=role_name,
             commit=False,
         )
         session.commit()
@@ -229,7 +302,7 @@ async def register_user(session: Session, user_data: UserCreate) -> dict[str, An
         session.rollback()
         raise
 
-    return success_response("OTP sent successfully", {"user_id": str(user.id)})
+    return success_response("OTP sent successfully.", {"id": str(user.id), "role": role_name})
 
 
 
@@ -237,8 +310,48 @@ async def register_user(session: Session, user_data: UserCreate) -> dict[str, An
 
 def verify_and_create_user(session: Session, data: VerifyOTPRequest) -> dict[str, Any]:
     otp = data.otp.strip()
-    user = find_user_by_id(session, data.user_id)
+    role_name = (data.role or "").strip().lower()
 
+    if role_name == "ngo_admin" or data.ngo_id is not None:
+        ngo = find_ngo_by_id(session, data.ngo_id) if data.ngo_id is not None else None
+        if ngo is None and data.user_id is not None:
+            ngo = find_ngo_by_id(session, data.user_id)
+        if ngo is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pending NGO not found")
+
+        verify_otp(session, ngo.email, otp)
+
+        try:
+            ngo.is_verified = True
+            delete_otp(session, ngo.email, commit=False)
+            session.commit()
+            session.refresh(ngo)
+        except Exception:
+            session.rollback()
+            raise
+
+        logger.info("NGO verified")
+        token = generate_account_token(
+            subject=str(ngo.id),
+            email=ngo.email or "",
+            role="ngo_admin",
+            account_type="ngo",
+        )
+        return success_response(
+            "OTP verified successfully.",
+            {
+                "id": str(ngo.id),
+                "name": ngo.name,
+                "email": ngo.email,
+                "phone": ngo.phone,
+                "role": "ngo_admin",
+                "account_type": "ngo",
+                "access_token": token,
+                "token_type": "bearer",
+            },
+        )
+
+    user = find_user_by_id(session, data.user_id) if data.user_id is not None else None
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pending user not found")
 
@@ -258,10 +371,14 @@ def verify_and_create_user(session: Session, data: VerifyOTPRequest) -> dict[str
     return success_response(
         "OTP verified successfully.",
         {
-            "full_name": user.full_name,
+            "id": str(user.id),
+            "name": user.full_name,
             "email": user.email,
             "phone": user.phone,
-            "token": token,
+            "role": user.role.value if user.role else None,
+            "account_type": "user",
+            "access_token": token,
+            "token_type": "bearer",
         },
     )
 
@@ -270,19 +387,46 @@ def authenticate_user(session: Session, data: LoginRequest) -> dict[str, Any]:
     email = str(data.email).strip().lower()
     user = find_user_by_email(session, email)
 
-    if not user:
-        logger.warning("Login failed: user not found")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if user is not None:
+        if not verify_password(data.password, user.password_hash):
+            logger.warning("Login failed: invalid password for user")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    if not verify_password(data.password, user.password_hash):
-        logger.warning("Login failed: invalid password")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        if not user.is_verified:
+            logger.warning("Login failed: user account is not verified")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User not verified")
 
-    token = generate_jwt(user)
-    logger.info("Login success")
-    response = success_response("Login successful", {"token": token, "user": serialize_user(user)})
-  
-    return response
+        token = generate_jwt(user)
+        login_payload = serialize_user_login(user)
+        login_payload["access_token"] = token
+        login_payload["token_type"] = "bearer"
+        logger.info("User login success")
+        return success_response("Login successful", login_payload)
+
+    ngo = find_ngo_by_email(session, email)
+    if ngo is not None:
+        if not verify_password(data.password, ngo.password_hash):
+            logger.warning("Login failed: invalid password for NGO")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+        if not ngo.is_verified:
+            logger.warning("Login failed: NGO account is not verified")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="NGO not verified")
+
+        token = generate_account_token(
+            subject=str(ngo.id),
+            email=ngo.email or email,
+            role="ngo_admin",
+            account_type="ngo",
+        )
+        login_payload = serialize_ngo_login(ngo)
+        login_payload["access_token"] = token
+        login_payload["token_type"] = "bearer"
+        logger.info("NGO login success")
+        return success_response("Login successful", login_payload)
+
+    logger.warning("Login failed: neither user nor NGO found")
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
 
 def google_login_user(session: Session, data: GoogleLoginRequest) -> dict[str, Any]:
@@ -355,6 +499,47 @@ def find_ngo_by_email(
 
     return result.scalar_one_or_none()
 
+
+def find_ngo_by_id(session: Session, ngo_id: str | UUID) -> Optional[NGOInfo]:
+    return session.get(NGOInfo, str(ngo_id))
+
+
+def create_ngo_account(
+    session: Session,
+    *,
+    full_name: str,
+    email: str,
+    phone: str,
+    password: str,
+    ngo_name: str,
+    commit: bool = True,
+) -> NGOInfo:
+    ngo = NGOInfo(
+        name=ngo_name,
+        email=email,
+        phone=phone,
+        owner_name=full_name,
+        owner_email=email,
+        owner_phone=phone,
+        password_hash=hash_password(password),
+        status="pending",
+        is_verified=False,
+        is_active=True,
+        accepts_rescue_requests=True,
+    )
+    session.add(ngo)
+
+    if commit:
+        try:
+            session.commit()
+            session.refresh(ngo)
+        except Exception:
+            session.rollback()
+            raise
+
+    return ngo
+
+
 async def register_ngo_owner(
     session: Session,
     ngo_data: NGOOwnerRegisterRequest
@@ -367,50 +552,28 @@ async def register_ngo_owner(
     phone = ngo_data.phone.strip()
     ngo_name = ngo_data.ngo_name.strip()
 
-    # Check if NGO Owner email already exists
-    if find_ngo_by_email(session, email):
+    if find_user_by_email(session, email) or find_ngo_by_email(session, email):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered"
         )
 
-    # Generate OTP
     otp = generate_testing_otp()
-
     store_otp(session, email, otp)
-
     logger.info("OTP generated")
 
-    # Send Email (Production)
-    # try:
-    #     await send_otp_email(email, otp)
-    # except Exception:
-    #     logger.warning("OTP email delivery failed")
-
     try:
-
-        ngo = NGOInfo(
-
-            name=ngo_name,
-
+        ngo = create_ngo_account(
+            session,
+            full_name=full_name,
             email=email,
             phone=phone,
-
-            owner_name=full_name,
-            owner_email=email,
-            owner_phone=phone,
-            password_hash=hash_password(ngo_data.password),
-            status="pending",
-            is_verified=False,
-            is_active=True,
-            accepts_rescue_requests=True
-
+            password=ngo_data.password,
+            ngo_name=ngo_name,
+            commit=False,
         )
-
-        session.add(ngo)
         session.commit()
         session.refresh(ngo)
-
     except Exception:
         session.rollback()
         raise
@@ -418,7 +581,8 @@ async def register_ngo_owner(
     return success_response(
         "OTP sent successfully",
         {
-            "ngo_id": str(ngo.id)
-        }
+            "id": str(ngo.id),
+            "role": "ngo_admin",
+        },
     )
 

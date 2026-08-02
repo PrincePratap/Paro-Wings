@@ -11,7 +11,9 @@ class SendOTPRequest(BaseModel):
 class VerifyOTPRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    user_id: UUID
+    user_id: UUID | None = None
+    ngo_id: UUID | None = None
+    role: str | None = None
     otp: str
 
     @field_validator("otp")
@@ -24,10 +26,14 @@ class VerifyOTPRequest(BaseModel):
 
 
 class VerifyOTPData(BaseModel):
-    full_name: str
+    id: str
+    name: str
     email: str
     phone: str
-    token: str
+    role: str
+    account_type: str
+    access_token: str
+    token_type: str = "bearer"
 
 
 class VerifyOTPResponse(BaseModel):
@@ -46,6 +52,21 @@ class LoginRequest(BaseModel):
         return str(value).strip().lower()
 
 
+class LoginResponseData(BaseModel):
+    id: str
+    name: str
+    email: str
+    phone: str
+    role: str
+    account_type: str
+    access_token: str
+    token_type: str = "bearer"
+
+
+class LoginResponse(BaseModel):
+    success: bool
+    message: str
+    data: LoginResponseData
 
 
 class VerifyNGOOTPRequest(BaseModel):
