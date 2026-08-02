@@ -199,3 +199,4 @@ def update_map_info(
         current_ngo,
         message="Map information updated successfully."
     )
+
