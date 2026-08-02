@@ -124,10 +124,6 @@ class OwnerDetails(BaseModel):
 
 
 class UpdateNGOLocationData(BaseModel):
-    ngo_id: str
-
-    owner: OwnerDetails
-
     address_line_1: Optional[str] = None
     landmark: Optional[str] = None
     city: Optional[str] = None
@@ -135,6 +131,12 @@ class UpdateNGOLocationData(BaseModel):
     state: Optional[str] = None
     country: Optional[str] = None
     postal_code: Optional[str] = None
+
+
+class UpdateNGOBasicInfo(BaseModel):
+    ngo_name: Optional[str] = None
+    registration_number: Optional[str] = None
+    description: Optional[str] = None
 
 
 class UpdateNGOLocationResponse(BaseModel):
@@ -171,3 +173,47 @@ class NGOLoginResponse(BaseModel):
     success: bool
     message: str
     data: NGOLoginData
+
+class UpdateContactInfo(BaseModel):
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    website: Optional[HttpUrl] = None
+    emergency_contact : Optional[str] = None
+
+class updateNGOOwnerInfo(BaseModel):
+    owner_name: Optional[str] = None
+    owner_email: Optional[EmailStr] = None
+    owner_phone: Optional[str] = None
+
+class UpdateNGOMapInfo(BaseModel):
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+class UpdateNGOSettings(BaseModel):
+    ngo_id: str
+    is_active: Optional[bool] = True
+    is_verified: Optional[bool] = False
+    is_suspended: Optional[bool] = False
+
+class UpdateNGOStatistics(BaseModel):
+    total_reports: Optional[int] = 0
+    total_rescues: Optional[int] = 0
+    rating: Optional[float] = 0.0
+    total_volunteers : Optional[int] = 0
+
+    
+  
+
+class UpdateNGOResponse(BaseModel):
+    success: bool
+    message: str
+    ngo_settings: UpdateNGOSettings
+    ngo_statistics: UpdateNGOStatistics
+    ngo_basic_info: UpdateNGOBasicInfo
+    ngo_locations : UpdateNGOLocationData
+    ngo_contact_info: UpdateContactInfo
+    ngo_owner_info: updateNGOOwnerInfo
+    ngo_map : UpdateNGOMapInfo
+
+
+

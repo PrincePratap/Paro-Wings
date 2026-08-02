@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 
 from database.dependency import get_db
 from models.ngo import NGOInfo
-from schemas.ngo import UpdateNGOLocationData , UpdateNGOLocationRequest  , NGOLoginRequest
+from schemas.ngo import(
+     UpdateNGOLocationRequest,
+     NGOLoginRequest)
 from utils.jwt import SECRET_KEY, ALGORITHM, create_access_token
 from utils.security import hash_password, verify_password
 from service.auth_service import generate_testing_otp, store_otp, success_response, error_response
@@ -24,8 +26,6 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
-from fastapi import Depends, HTTPException, Request, status
-from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -104,11 +104,10 @@ def find_ngo_by_id(
     ).first()
 
 
-
-def update_ngo_location(
+def update_ngo_info(
     session: Session,
     current_ngo: NGOInfo,
-    data: UpdateNGOLocationRequest
+    data: dict
 ):
     ngo = session.query(NGOInfo).filter(
         NGOInfo.id == current_ngo.id
@@ -120,36 +119,20 @@ def update_ngo_location(
             detail="NGO not found."
         )
 
-    ngo.address_line_1 = data.address_line_1
-    ngo.landmark = data.landmark
-    ngo.city = data.city
-    ngo.district = data.district
-    ngo.state = data.state
-    ngo.country = data.country
-    ngo.postal_code = data.postal_code
+    for key, value in data.items():
+        if hasattr(ngo, key):
+            setattr(ngo, key, value)
 
     session.commit()
     session.refresh(ngo)
 
     return {
         "success": True,
-        "message": "NGO location updated successfully.",
-        "data": {
-            "ngo_id": ngo.id,
-            "owner": {
-                "owner_name": ngo.owner_name,
-                "owner_email": ngo.owner_email,
-                "owner_phone": ngo.owner_phone
-            },
-            "address_line_1": ngo.address_line_1,
-            "landmark": ngo.landmark,
-            "city": ngo.city,
-            "district": ngo.district,
-            "state": ngo.state,
-            "country": ngo.country,
-            "postal_code": ngo.postal_code
-        }
+        "message": "NGO information updated successfully.",
+        "data": serialize_ngo(ngo)
     }
+
+
 
 
 def get_current_ngo(
@@ -453,3 +436,9 @@ def manage_volunteer_request_service(
             "status": volunteer_request.status
         }
     )
+
+
+
+
+
+

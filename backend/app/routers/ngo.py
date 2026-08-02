@@ -1,48 +1,40 @@
-from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException,status
 from sqlalchemy.orm import Session
 
 from database.dependency  import get_db
 from models.ngo import NGOInfo
-from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 
-from database.dependency import get_db
-from models.ngo import NGOInfo
+
 from schemas.ngo import (
     NGOOwnerRegisterRequest,
-    UpdateNGOLocationResponse,
-    UpdateNGOLocationRequest,
+    UpdateContactInfo,
     NGOLoginRequest,
-    NGOLoginResponse
+    NGOLoginResponse,
+    UpdateNGOResponse,
+    UpdateNGOBasicInfo,
+    updateNGOOwnerInfo,
+    UpdateNGOLocationData,
+    UpdateNGOMapInfo
+    )
+from service.ngo_update_service import update_map_info, update_ngo_basic_info, update_ngo_contact_info , update_ngo_owner_info , update_ngo_location_info
 
-)
 from service.auth_service import register_ngo_owner
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException, status
 import traceback
 from schemas.otp import  VerifyOTPRequest, VerifyOTPResponse , VerifyNGOOTPRequest , VerifyNGOOTPResponse
 from service.ngo_service import (
-    update_ngo_location,
     get_current_ngo,
-    login_ngo,
     authenticate_ngo,
     verify_and_create_ngo,
     get_volunteer_requests
 )
-from passlib.context import CryptContext
 
-from models.volunteer_request import VolunteerRequest
-import traceback
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 
-from models.ngo import NGOInfo
+
 from schemas.volunteer_request import VolunteerRequestActionRequest
 from service.ngo_service import (
     get_current_ngo,
@@ -108,21 +100,123 @@ def verify_ngo_otp(
             },
         )
 
+
+
 @router.patch(
-    "/location",
-    response_model=UpdateNGOLocationResponse
+    "/basic-info",
+    response_model=UpdateNGOResponse
+)
+def update_basic_info(
+    data: UpdateNGOBasicInfo,
+    current_ngo: NGOInfo = Depends(get_current_ngo),
+    db: Session = Depends(get_db),
+):
+    try:
+        return update_ngo_basic_info(
+            session=db,
+            current_ngo=current_ngo,
+            data=data,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+
+@router.patch(
+    "/contact-info",
+    response_model=UpdateNGOResponse
+)
+def update_contact_info(
+    data: UpdateContactInfo,
+    current_ngo: NGOInfo = Depends(get_current_ngo),
+    db: Session = Depends(get_db),
+):
+    try:
+        return update_ngo_contact_info(
+            session=db,
+            current_ngo=current_ngo,
+            data=data,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+
+@router.patch(
+    "/owner-info",
+    response_model=UpdateNGOResponse
+)
+def update_owner_info(
+    data: updateNGOOwnerInfo,
+    current_ngo: NGOInfo = Depends(get_current_ngo),
+    db: Session = Depends(get_db),
+):
+    try:
+        return update_ngo_owner_info(
+            session=db,
+            current_ngo=current_ngo,
+            data=data,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+@router.patch(
+    "/location-info",
+    response_model=UpdateNGOResponse
 )
 def update_location(
-    data: UpdateNGOLocationRequest,
+    data: UpdateNGOLocationData,
     current_ngo: NGOInfo = Depends(get_current_ngo),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    return update_ngo_location(
-        session=db,
-        current_ngo=current_ngo,
-        data=data
-    )
+    try:
+        return update_ngo_location_info(
+            session=db,
+            current_ngo=current_ngo,
+            data=data,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
 
+@router.patch("/map-info", response_model=UpdateNGOResponse)
+def update_map(
+    data: UpdateNGOMapInfo,
+    current_ngo: NGOInfo = Depends(get_current_ngo),
+    db: Session = Depends(get_db),
+):
+    try:
+        return update_map_info(
+            session=db,
+            current_ngo=current_ngo,
+            data=data,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
 
 @router.post("/login", response_model=NGOLoginResponse)
 def login(
@@ -190,4 +284,4 @@ def manage_volunteer_request(
             status_code=500,
             detail=str(e),
         )
- 
+
