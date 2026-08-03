@@ -200,3 +200,28 @@ def update_map_info(
         message="Map information updated successfully."
     )
 
+def get_ngo_profile(
+    session: Session,
+    current_ngo: NGOInfo,
+) -> UpdateNGOResponse:
+    """
+    Returns the complete NGO profile.
+    """
+
+    ngo = (
+        session.query(NGOInfo)
+        .filter(NGOInfo.id == current_ngo.id)
+        .first()
+    )
+
+    if not ngo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="NGO not found."
+        )
+
+    return build_ngo_response(
+        ngo,
+        message="NGO profile fetched successfully."
+    )
+

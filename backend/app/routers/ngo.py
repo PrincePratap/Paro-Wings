@@ -18,7 +18,7 @@ from schemas.ngo import (
     UpdateNGOLocationData,
     UpdateNGOMapInfo
     )
-from service.ngo_update_service import update_map_info, update_ngo_basic_info, update_ngo_contact_info , update_ngo_owner_info , update_ngo_location_info
+from service.ngo_update_service import get_ngo_profile, update_map_info, update_ngo_basic_info, update_ngo_contact_info , update_ngo_owner_info , update_ngo_location_info
 
 from service.auth_service import register_ngo_owner
 from fastapi.responses import JSONResponse
@@ -284,4 +284,18 @@ def manage_volunteer_request(
             status_code=500,
             detail=str(e),
         )
+
+
+@router.get(
+    "/profile",
+    response_model=UpdateNGOResponse
+)
+def get_profile(
+    current_ngo: NGOInfo = Depends(get_current_ngo),
+    session: Session = Depends(get_db),
+):
+    return get_ngo_profile(
+        session=session,
+        current_ngo=current_ngo,
+    )
 
