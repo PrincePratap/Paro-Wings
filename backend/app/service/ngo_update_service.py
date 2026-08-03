@@ -27,7 +27,7 @@ def build_ngo_response(
         message=message,
 
         ngo_settings=UpdateNGOSettings(
-            ngo_id=ngo.id,
+            ngo_id=str(ngo.id),
             accepts_rescue_requests=ngo.accepts_rescue_requests,
             is_verified=ngo.is_verified,
             is_active=ngo.is_active,
